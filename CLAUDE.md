@@ -1,78 +1,54 @@
-# vici-crm
+# vici-qa-crm
 
-A CRM-style dashboard on top of a hosted VICIdial dialer. It shows what every human agent
-is doing (live floor, talk/pause/wait time, calls, dispositions, callbacks, transfers) and
-runs AI QA on call recordings. Roles: admin, sales_manager, team_lead, hr, qa, agent.
+A CRM-style dashboard and QA system on top of our hosted VICIdial dialer, built from scratch.
+Read `docs/PROJECT_CONTEXT.md` before any task: it holds the requirements, every finding
+from testing the VICIdial API on our server, and the decisions already made.
 
-Version 1 only READS from VICIdial. Never call a VICIdial function that changes data
-(add_lead, update_lead, add_dnc_phone, update_user, etc.).
+@docs/PROJECT_CONTEXT.md
 
-## Stack and layout
+## How to work with me
 
-npm workspaces monorepo, TypeScript (strict) everywhere.
+- I am a junior developer. Before writing code, show a short plan and wait for my OK.
+- Explain any new library or pattern in 2–3 plain sentences the first time you use it.
+- Ask before adding a dependency, renaming files or changing the folder layout.
+- Small steps: one feature per change, then run typecheck and tests.
+- Never put real passwords, tokens or customer data (names, phone numbers) in code,
+  tests, fixtures, logs or chat. Fixtures use masked values.
+
+## Layout (npm workspaces monorepo, TypeScript strict)
 
 ```
-apps/web      React + Vite + Tailwind + shadcn/ui + TanStack Query + React Router + Recharts
-apps/api      Express: REST API, auth check, role check, recording proxy, Dispo Call URL webhook
-apps/worker   Node: scheduled VICIdial sync jobs and QA jobs (pg-boss queue)
-packages/shared  Types, VICIdial client and parsers, timezone helpers, zod schemas
-prisma/       Prisma schema and migrations (database is Supabase Postgres)
+apps/web         @vici/web     React + Vite + Tailwind + shadcn/ui + React Router + TanStack Query + Recharts
+apps/api         @vici/api     Express REST API: auth, roles, data routes, recording proxy, webhook
+apps/worker      @vici/worker  Background jobs: VICIdial sync and QA (pg-boss)
+packages/shared  @vici/shared  VICIdial client, parsers, zod schemas, timezone helpers, shared types
+packages/db      @vici/db      Prisma schema, migrations and the shared Prisma client
 ```
 
-- Database: Supabase Postgres, accessed with Prisma from api and worker.
-- Login: Supabase Auth in the web app. The web app sends `Authorization: Bearer <access token>`
-  to the api. The api verifies the token with Supabase and loads the user's role from the
-  `profiles` table. Every route checks the role on the server.
-- Queue and schedules: pg-boss (runs inside the same Postgres).
-- Transcription: Deepgram (pre-recorded, diarize). QA scoring: OpenAI with structured JSON output.
+- Workspace packages export TypeScript source (`"main": "src/index.ts"`). api and worker run
+  with `tsx` in development and production; `tsc --noEmit` is used for type checking.
+- Environment: server secrets in the root `.env` (loaded by api and worker with
+  `node --env-file`); public web values only in `apps/web/.env` (`VITE_` prefix).
+- In development Vite proxies `/api` to the api on port 4000. In production the api serves
+  the built web app from the same origin, so no CORS is needed.
 
-## Commands
+## Commands (run from the repo root)
 
-- `npm run dev`      run web, api and worker together
-- `npm run build`    build all workspaces
-- `npm test`         run vitest in all workspaces
-- `npx prisma migrate dev` create and apply a migration
+- `npm run dev`        api + worker + web together
+- `npm run typecheck`  tsc in every workspace
+- `npm test`           vitest
+- `npm run build`      build the web app
 
-## VICIdial API rules (learned from testing on our server)
+## Non-negotiable rules
 
-- Endpoint: `${VICIDIAL_BASE_URL}/non_agent_api.php`.
-- Always send requests as POST with an `application/x-www-form-urlencoded` body
-  (`source`, `user`, `pass`, `function`, ...). Never put credentials in a URL.
-- VICIdial build 260902 (2.14). `users_list` does NOT exist on this build.
-- Ask for JSON with `stage=json&header=YES` where supported. JSON shape:
-  `{ "result": "SUCCESS" | "ERROR", "result_reason": "...", "data": [ ... ] }`.
-  HTTP 200 does not mean success: always check `result`.
-- Functions that do NOT return JSON:
-  - `call_status_stats`: pipe text `campaign|type|total|human_answered|HH-count,...|STATUS-count,...`
-  - `call_dispo_report`: CSV text
-  - `lead_status_search`: records separated by `---------- START OF RECORD n ----------`,
-    one `key => value` per line. It returns leads that had that status in the call log on
-    that date, but shows each lead's CURRENT status.
-- `recording_lookup` needs `agent_user` + `date` (date alone is rejected). Query per agent.
-  With `duration=Y` the JSON keys are shifted: key `location` holds the duration in seconds
-  and key `"5"` holds the recording URL. Map by position, not by name.
-- Recording file name format: `YYYYMMDD-HHMMSS_<phone>-all.mp3`, served from a separate IP
-  over https. Campaign recording is ALLFORCE, so every call has a recording.
-- `agent_stats_export` with `time_format=S` returns seconds. Its `login_time` and `pause_pct`
-  are unreliable: calculate logged-in time as pause + wait + talk + dispo + dead.
-- The campaign is MANUAL dial, so agents are paused between calls. Pause time is not break
-  time; breaks come from pause codes (from `logged_in_agents` with `show_sub_status=YES`).
-- Server times are US Eastern (`America/New_York`). Convert to UTC before saving.
-  Store UTC in the database; show times in the configured timezone.
-- Success status is `XFER` (transferred). Callback status is `CALLBK`.
-- VICIdial has no rate limit or caching. Keep to about 1 request per second and never poll
+- VICIdial is READ-ONLY in version 1. Never call functions that change data
+  (add_lead, update_lead, add_dnc_phone, update_user, update_campaign, ...).
+- Call VICIdial with POST and an `application/x-www-form-urlencoded` body. Never put
+  credentials in a URL. Redact `pass`, tokens and API keys in every log line and error.
+- Every sync is idempotent: upsert on natural keys. Running a job twice never duplicates rows.
+- Store all times in UTC. VICIdial server time is America/New_York.
+- Validate every external input (VICIdial responses, request bodies, webhook params) with zod.
+- Roles are checked on the server for every api route. The browser never receives VICIdial
+  URLs or credentials; recordings stream through `/api/recordings/:id`.
+- VICIdial has no rate limit or caching: about 1 request per second at most, and no polling
   faster than every 30 seconds.
-
-## Rules for all code
-
-- Secrets live only in `.env` files (never committed). Never log credentials: redact `pass`,
-  tokens and API keys in every log line and error message.
-- Every sync is idempotent: upsert on natural keys (`recording_id`, `user + date`,
-  `lead_id`, etc.). Running a job twice must never create duplicates.
-- Jobs retry on failure with backoff; a nightly job re-syncs the previous day.
-- Validate all external input (VICIdial responses, request bodies, webhook params) with zod.
-- Recordings are streamed to the browser through the api (`/api/recordings/:id`) after the
-  role check. Never send VICIdial recording URLs to the browser.
-- Keep modules small. Write vitest tests for every VICIdial parser using fixtures in
-  `packages/shared/test/fixtures` (with phone numbers and names masked).
-- Ask before adding a new dependency or changing the folder layout.
