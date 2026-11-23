@@ -1,0 +1,23 @@
+{
+  "name": "vici-qa-crm",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,worker,web -c blue,magenta,green \"npm run dev -w @vici/api\" \"npm run dev -w @vici/worker\" \"npm run dev -w @vici/web\"",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w @vici/web",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "concurrently": "^10.0.7",
+    "prettier": "^3.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  }
+}
