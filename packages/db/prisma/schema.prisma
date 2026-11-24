@@ -1,0 +1,323 @@
+// Database schema for vici-qa-crm.
+//
+// Conventions:
+// - Model and field names are camelCase in TypeScript; tables and columns are snake_case in
+//   Postgres (@@map / @map).
+// - Every time is timestamptz (UTC). Calendar days (US Eastern) are `date`.
+// - VICIdial ids (user, lead, recording, list, campaign, call) are text: we never do maths on
+//   them, and text avoids BigInt problems in JSON.
+// - Tables written by sync jobs use their natural key as primary key, so a job can upsert and
+//   running it twice never duplicates rows.
+// - VICIdial mirror tables have no foreign keys, so sync jobs can run in any order.
+// - Row Level Security is enabled on every table in the migration SQL (no policies).
+//   New tables in later migrations must enable it too.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Users and access (roles with per-user overrides)
+// ---------------------------------------------------------------------------
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  permissions RolePermission[]
+  profiles    Profile[]
+
+  @@map("roles")
+}
+
+/// One row per feature, e.g. `calls.view`.
+model Permission {
+  key         String @id
+  description String
+
+  roles     RolePermission[]
+  overrides UserPermissionOverride[]
+
+  @@map("permissions")
+}
+
+/// Default features of a role.
+model RolePermission {
+  roleId        Int    @map("role_id")
+  permissionKey String @map("permission_key")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+  @@map("role_permissions")
+}
+
+/// App users. `id` is the Supabase auth.users id (no foreign key across schemas).
+model Profile {
+  id           String   @id @db.Uuid
+  email        String   @unique
+  fullName     String?  @map("full_name")
+  roleId       Int      @map("role_id")
+  /// VICIdial user id, for agents.
+  vicidialUser String?  @map("vicidial_user")
+  /// VICIdial user_group, for team leads.
+  team         String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  role      Role                     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  overrides UserPermissionOverride[]
+
+  @@index([roleId])
+  @@map("profiles")
+}
+
+/// Admin grants (granted = true) or removes (granted = false) one feature for one user.
+model UserPermissionOverride {
+  userId        String   @map("user_id") @db.Uuid
+  permissionKey String   @map("permission_key")
+  granted       Boolean
+  /// Profile id of the admin who made the change.
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user       Profile    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([userId, permissionKey])
+  @@map("user_permission_overrides")
+}
+
+// ---------------------------------------------------------------------------
+// Business outcomes (admins map VICIdial statuses to their own categories)
+// ---------------------------------------------------------------------------
+
+/// Every VICIdial status code we have seen.
+model VicidialStatus {
+  status      String   @id
+  /// Editable by admins.
+  name        String?
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+
+  mappings StatusMapping[]
+
+  @@map("vicidial_statuses")
+}
+
+model OutcomeCategory {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  name      String
+  color     String?
+  isSuccess Boolean  @default(false) @map("is_success")
+  sortOrder Int      @default(0) @map("sort_order")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  mappings StatusMapping[]
+
+  @@map("outcome_categories")
+}
+
+/// VICIdial status -> business outcome. campaign_id '*' means all campaigns.
+model StatusMapping {
+  id                Int      @id @default(autoincrement())
+  status            String
+  campaignId        String   @default("*") @map("campaign_id")
+  outcomeCategoryId Int      @map("outcome_category_id")
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  vicidialStatus  VicidialStatus  @relation(fields: [status], references: [status], onDelete: Restrict)
+  outcomeCategory OutcomeCategory @relation(fields: [outcomeCategoryId], references: [id], onDelete: Restrict)
+
+  @@unique([status, campaignId])
+  @@index([outcomeCategoryId])
+  @@map("status_mappings")
+}
+
+// ---------------------------------------------------------------------------
+// VICIdial data (written by sync jobs)
+// ---------------------------------------------------------------------------
+
+model Agent {
+  vicidialUser String   @id @map("vicidial_user")
+  fullName     String?  @map("full_name")
+  userGroup    String?  @map("user_group")
+  active       Boolean  @default(true)
+  firstSeenAt  DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+  lastSeenAt   DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+
+  @@map("agents")
+}
+
+model Campaign {
+  campaignId String   @id @map("campaign_id")
+  name       String?
+  active     Boolean  @default(true)
+  dialMethod String?  @map("dial_method")
+  raw        Json
+  syncedAt   DateTime @updatedAt @map("synced_at") @db.Timestamptz(3)
+
+  @@map("campaigns")
+}
+
+/// One live floor reading per agent, taken every 30-60 seconds.
+model AgentStatusSnapshot {
+  vicidialUser String   @map("vicidial_user")
+  takenAt      DateTime @map("taken_at") @db.Timestamptz(3)
+  campaignId   String?  @map("campaign_id")
+  status       String
+  pauseCode    String?  @map("pause_code")
+  subStatus    String?  @map("sub_status")
+  leadId       String?  @map("lead_id")
+  callId       String?  @map("call_id")
+  callsToday   Int?     @map("calls_today")
+
+  @@id([vicidialUser, takenAt])
+  @@index([takenAt])
+  @@map("agent_status_snapshots")
+}
+
+/// One row per agent per US Eastern day, from agent_stats_export.
+model AgentDailyStat {
+  vicidialUser String   @map("vicidial_user")
+  statDate     DateTime @map("stat_date") @db.Date
+  calls        Int
+  talkSec      Int      @map("talk_sec")
+  pauseSec     Int      @map("pause_sec")
+  waitSec      Int      @map("wait_sec")
+  dispoSec     Int      @map("dispo_sec")
+  deadSec      Int      @map("dead_sec")
+  /// pause + wait + talk + dispo + dead (VICIdial's login_time is wrong on our server).
+  loggedInSec  Int      @map("logged_in_sec")
+  sessions     Int
+  pauses       Int
+  raw          Json
+  syncedAt     DateTime @updatedAt @map("synced_at") @db.Timestamptz(3)
+
+  @@id([vicidialUser, statDate])
+  @@index([statDate])
+  @@map("agent_daily_stats")
+}
+
+/// One row per recording (every call is recorded).
+model Call {
+  recordingId  String   @id @map("recording_id")
+  vicidialUser String   @map("vicidial_user")
+  leadId       String?  @map("lead_id")
+  phone        String?
+  startedAt    DateTime @map("started_at") @db.Timestamptz(3)
+  durationSec  Int?     @map("duration_sec")
+  /// Server only: never send this to the browser. Recordings stream through /api/recordings/:id.
+  recordingUrl String   @map("recording_url")
+  campaignId   String?  @map("campaign_id")
+  listId       String?  @map("list_id")
+  /// VICIdial status; may be filled in by a later sync.
+  status       String?
+  syncedAt     DateTime @updatedAt @map("synced_at") @db.Timestamptz(3)
+
+  @@index([startedAt])
+  @@index([vicidialUser])
+  @@index([leadId])
+  @@map("calls")
+}
+
+/// Results of lead_status_search: leads that had `status` on `call_date`.
+model LeadStatusHit {
+  status        String
+  callDate      DateTime  @map("call_date") @db.Date
+  leadId        String    @map("lead_id")
+  vicidialUser  String?   @map("vicidial_user")
+  /// The lead's status now, which can differ from `status` (see PROJECT_CONTEXT.md).
+  currentStatus String?   @map("current_status")
+  phone         String?
+  listId        String?   @map("list_id")
+  lastCallAt    DateTime? @map("last_call_at") @db.Timestamptz(3)
+  raw           Json
+  syncedAt      DateTime  @updatedAt @map("synced_at") @db.Timestamptz(3)
+
+  @@id([status, callDate, leadId])
+  @@index([callDate])
+  @@map("lead_status_hits")
+}
+
+/// Callback details from lead_callback_info.
+model Callback {
+  leadId       String   @map("lead_id")
+  callbackAt   DateTime @map("callback_at") @db.Timestamptz(3)
+  vicidialUser String?  @map("vicidial_user")
+  status       String?
+  comments     String?
+  raw          Json
+  syncedAt     DateTime @updatedAt @map("synced_at") @db.Timestamptz(3)
+
+  @@id([leadId, callbackAt])
+  @@index([callbackAt])
+  @@map("callbacks")
+}
+
+// ---------------------------------------------------------------------------
+// App
+// ---------------------------------------------------------------------------
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  /// Profile id of the user who changed it.
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  @@map("settings")
+}
+
+enum SyncStatus {
+  running
+  success
+  failed
+
+  @@map("sync_status")
+}
+
+/// One row per job run, for the sync health page.
+model SyncRun {
+  id          Int        @id @default(autoincrement())
+  job         String
+  startedAt   DateTime   @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt  DateTime?  @map("finished_at") @db.Timestamptz(3)
+  status      SyncStatus @default(running)
+  rowsWritten Int        @default(0) @map("rows_written")
+  error       String?
+
+  @@index([job, startedAt])
+  @@map("sync_runs")
+}
+
+/// Who changed what (permissions, mappings, settings, QA overrides).
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  /// Profile id of the user who made the change; kept even if that user is deleted.
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_log")
+}

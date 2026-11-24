@@ -10,7 +10,10 @@
     "dev": "concurrently -n api,worker,web -c blue,magenta,green \"npm run dev -w @vici/api\" \"npm run dev -w @vici/worker\" \"npm run dev -w @vici/web\"",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build -w @vici/web",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "npm run generate -w @vici/db",
+    "db:migrate": "npm run migrate:deploy -w @vici/db",
+    "db:seed": "npm run seed -w @vici/db"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
@@ -21,6 +24,8 @@
     "vitest": "^5.1.1"
   },
   "allowScripts": {
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true
   }
 }

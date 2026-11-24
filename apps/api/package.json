@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@vici/db": "*",
     "@vici/shared": "*",
     "express": "^5.3.0",
     "helmet": "^8.3.0",

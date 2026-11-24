@@ -8,5 +8,8 @@
     "start": "tsx --env-file=../../.env src/index.ts",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "@vici/shared": "*" }
+  "dependencies": {
+    "@vici/db": "*",
+    "@vici/shared": "*"
+  }
 }
