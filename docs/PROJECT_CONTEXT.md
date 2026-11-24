@@ -10,7 +10,8 @@ and QA staff cannot easily see what agents do. We build a web app that:
 - lists every call with its recording, transfers (success) and callbacks,
 - gives HR attendance (login, logout, breaks, forgotten logouts),
 - runs AI QA on every recording (transcribe, score against rules, flag mismatches),
-- has roles: admin, sales_manager, team_lead, hr, qa, agent (agent: own stats only, to confirm).
+- has role-based access with per-feature permissions that an admin can grant or remove for any
+  user, taking effect immediately (see section 5).
 
 Version 1 only reads from VICIdial. Writing back (lead updates, DNC, callbacks) is version 2.
 Ringba and the old n8n QC bot are out of scope.
@@ -28,14 +29,18 @@ Ringba and the old n8n QC bot are out of scope.
 | R7 | Call list: time, agent, campaign, list, phone, lead, length, disposition, recording |
 | R8 | Call detail: lead info, call history of the number, recording player, transcript, QA |
 | R9 | Disposition breakdown by agent, campaign and day |
-| R10 | Successes (status XFER) per agent, campaign, day; conversion rate |
+| R10 | Successes per agent, campaign, day; conversion rate. Success = business outcome categories marked as success (see R16 mapping), not raw VICIdial statuses |
 | R11 | Callbacks due today, upcoming, missed |
 | R12 | HR attendance: days present, late logins, break time vs allowed, forgotten logouts |
-| R13–R17 | QA: pick up recordings > N seconds, transcribe with speaker separation, AI score against rules with quotes, flag AI vs agent disposition mismatch, QA review queue with overrides and audit log |
+| R13–R14 | QA: pick up recordings > N seconds, transcribe with speaker separation |
+| R15 | AI scores each call against the rules, with quotes. The QA prompt/instructions are editable in the dashboard (not only in code), versioned |
+| R16 | Flag calls where the AI outcome differs from the agent's. Teams define their own outcome categories and which sentiments to analyse; VICIdial statuses are mapped to these business outcomes (e.g. "appointment scheduled" is recorded in VICIdial as SALE) |
+| R17 | QA review queue with accept/override, comments and audit log |
 | R18 | QA score trend per agent |
 | R19 | CSV and PDF export |
 | R20 | Main timezone US Eastern, reference timezone Asia/Karachi |
-| R21–R23 | Users and roles, settings (QA scorecard, min call length), sync health page |
+| R21 | Users, roles and per-feature permissions; admin can grant or remove a feature for any user in real time |
+| R22–R23 | Settings (QA scorecard, min call length, outcome mapping), sync health page |
 
 Freshness targets (all settings): live floor ≤ 60 s, stats ≤ 5 min, QA ≤ ~15 min after the
 call. Recordings and transcripts kept 90 days by default.
@@ -94,8 +99,23 @@ call. Recordings and transcripts kept 90 days by default.
 - Hosting: one Linux server with a fixed IP (whitelisted on the dialer) runs api + worker
   and serves the built web app. Supabase is hosted separately.
 
-## 5. Waiting for the owner
+## 5. Owner feedback (24 Nov 2026)
 
-Hosting details, permission to use the Dispo Call URL, QA rules and scorecard, HR rules
-(shifts, late login, allowed breaks), first users and roles, Deepgram/OpenAI accounts,
-and whether this will be sold to other call centers (multi-tenant).
+- **RBAC:** fixed roles are the starting point, but an admin can grant or remove any feature
+  for any single user, and the change applies immediately (no re-login). Permissions are read
+  from the database on each request, never baked into the login token.
+- **R15:** QA prompt instructions must be editable from the dashboard.
+- **R16:** VICIdial dispositions do not match the outcomes the business tracks. Teams define
+  their own outcome categories (and sentiments to analyse), and VICIdial statuses are mapped
+  to them. Example: an appointment scheduled is saved in VICIdial as SALE.
+- **Hosting:** the client provides the server. Not a blocker.
+- **Webhook vs polling:** polling is the base for everything; the Dispo Call URL webhook is
+  added once the server is live, for real-time call outcomes. A nightly re-sync covers
+  anything a webhook missed.
+
+## 6. Waiting for the owner
+
+Permission to use the Dispo Call URL once the server is live, the QA rules and scorecard
+(old QC bot rules or new ones; greeting, script, disclosures, tone), the business outcome
+categories and their mapping to VICIdial statuses, and HR rules (shifts, late login,
+allowed breaks).

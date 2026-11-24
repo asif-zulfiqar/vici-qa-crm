@@ -23,7 +23,7 @@ VICIdial.
 ## Architecture
 
 ```
-               ┌──────────────────────────── our server (fixed IP) ───────────────────────────┐
+               ┌──────────────────────────── server (fixed IP) ───────────────────────────┐
  Browser ───── │  apps/api  (Express)  ── serves the web app, REST API, recording proxy       │
  (React app)   │  apps/worker (Node)   ── VICIdial sync jobs + QA jobs (pg-boss)              │
                └───────────┬──────────────────────────────┬───────────────────────────────────┘
