@@ -76,22 +76,56 @@ packages import each other by name (for example `import { ... } from "@vici/shar
 
 ### Prerequisites
 
-- Node.js 22 or newer and npm 10 or newer
-- A Supabase project
-- Access to the VICIdial Non-Agent API from a whitelisted IP
+- Node.js 22 or newer and npm 11 or newer
+- A Supabase project (free plan is enough for development)
+- Access to the VICIdial Non-Agent API: the machine must be on the dialer's IP whitelist, and you
+  need a VICIdial user with API access and "View Reports"
 
-### Setup
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/asif-zulfiqar/vici-qa-crm.git
 cd vici-qa-crm
 npm install
+```
 
-cp .env.example .env                       # server values
+`npm install` installs every workspace and runs `prisma generate`, which creates the typed
+database client in `packages/db/src/generated` (not committed).
+
+### 2. Environment files
+
+```bash
+cp .env.example .env                       # server values (api, worker, Prisma)
 cp apps/web/.env.example apps/web/.env     # public frontend values
 ```
 
-Fill in both `.env` files (see below), then start everything:
+Where to find each Supabase value:
+
+| Variable | Supabase dashboard |
+| --- | --- |
+| `DATABASE_URL` | Connect → Transaction pooler (port 6543), add `?pgbouncer=true` |
+| `DIRECT_URL` | Connect → Session pooler or Direct connection (port 5432) |
+| `SUPABASE_URL`, `VITE_SUPABASE_URL` | Project Settings → API → Project URL |
+| `SUPABASE_SECRET_KEY` | Project Settings → API Keys → Secret key (server only) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Project Settings → API Keys → Publishable key |
+
+Replace `[YOUR-PASSWORD]` in both connection strings with the database password. The VICIdial
+values go in the root `.env` too.
+
+### 3. Database
+
+Skip this step if you are pointing at a Supabase project that is already set up.
+
+```bash
+npm run db:migrate              # creates all tables and enables row level security
+npm run db:seed                 # roles, permissions and VICIdial statuses (safe to re-run)
+npm run check -w @vici/db       # should print: database OK
+```
+
+In Supabase → Authentication → Sign In / Providers, turn off "Allow new users to sign up".
+Users are invited by an admin.
+
+### 4. Run
 
 ```bash
 npm run dev
@@ -104,6 +138,14 @@ npm run dev
 
 In development, Vite forwards `/api` requests to the API, so the web app and API share one
 origin.
+
+### 5. Check
+
+```bash
+npm run typecheck
+npm test
+npm run probe -w @vici/shared   # calls the real dialer; needs a whitelisted IP
+```
 
 ## Environment variables
 

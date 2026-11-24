@@ -38,10 +38,28 @@ every quirk of our VICIdial build.
 | `leadStatusSearch(status, date)` | lead_status_search | Record text (`START OF RECORD`, `key => value`) → array of objects |
 | `leadCallbackInfo(leadId)` | lead_callback_info | JSON; not found → `[]` |
 | `leadAllInfo(leadId)` | lead_all_info | JSON |
-| `phoneNumberLog(phone)` | phone_number_log | JSON, `type=ALL` |
+| `phoneNumberLog(phone)` | phone_number_log | JSON, `type=ALL`. Returns every call to that number with `call_date`, `length_in_sec`, `call_status` (the disposition of THAT call), `hangup_reason` and `user` |
 | `callidInfo(callId)` | callid_info | JSON, `detail=YES` |
 
 Do not add any function that writes to VICIdial.
+
+## Confirmed in testing (25 Nov 2026)
+
+- `logged_in_agents` and `agent_status` DO return JSON with `stage=json`. Use JSON; no CSV
+  parser is needed. Fixtures: `logged_in_agents.json`, `agent_status.json` (the `.csv` files
+  are old samples and can be deleted).
+- `lead_all_info` and `phone_number_log` fixtures are now available (`lead_all_info.json`,
+  `phone_number_log.json`). Use strict schemas for the fields shown there, with passthrough
+  for any extra fields.
+- `result_reason` counts are NOT reliable: `phone_number_log` said `RECORDS FOUND: 0` while
+  returning 4 records. Always use `data.length`, never the number in `result_reason`.
+- New agents appear without notice (agent 1005 showed up). Never hard-code the agent list.
+- How a call gets its disposition (used by the worker in Task 03, but write and test the
+  helper here as `matchCallLog(recording, logRows)`): a recording has `user`, `start_time`
+  and the phone from the file name; the matching `phone_number_log` row has the same `user`
+  and phone, and a `call_date` 0–60 seconds after the recording `start_time`
+  (example: recording 10:27:36, log row 10:27:44). If several rows match, take the closest.
+  The match gives the call's `call_status`, `length_in_sec` and `hangup_reason`.
 
 ## Types and time
 
