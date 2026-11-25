@@ -13,6 +13,7 @@
     "seed": "prisma db seed",
     "studio": "prisma studio",
     "check": "tsx --env-file=../../.env src/check.ts",
+    "admin:promote": "tsx --env-file=../../.env src/admin-promote.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

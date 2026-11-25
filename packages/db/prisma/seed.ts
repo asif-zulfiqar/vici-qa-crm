@@ -3,32 +3,18 @@
 //   (role names, role permissions, status names).
 // - Permission descriptions belong to the code, so they are updated.
 import { prisma } from "../src/client";
+import {
+  ADMIN_ROLE_KEY,
+  PENDING_ROLE_KEY,
+  PERMISSION_KEYS,
+  PERMISSIONS,
+  type PermissionKey,
+} from "../src/permission-keys";
 
-const PERMISSIONS: Record<string, string> = {
-  "live_floor.view": "See the live floor",
-  "agents.view": "See stats of all agents",
-  "agents.view_own": "See own stats only",
-  "calls.view": "See the call list and call details",
-  "calls.listen": "Play call recordings",
-  "calls.transcript": "Read call transcripts",
-  "transfers.view": "See transfers (successes)",
-  "callbacks.view": "See callbacks",
-  "hr.view": "See HR attendance",
-  "qa.view": "See QA results of all agents",
-  "qa.view_own": "See own QA results only",
-  "qa.review": "Review and override QA results",
-  "qa.prompts.manage": "Edit QA prompts and scorecards",
-  "outcomes.manage": "Edit outcome categories and status mappings",
-  "reports.export": "Export CSV and PDF reports",
-  "users.manage": "Manage users, roles and permissions",
-  "settings.manage": "Change app settings",
-  "sync.view": "See the sync health page",
-};
+const ALL = PERMISSION_KEYS;
 
-const ALL = Object.keys(PERMISSIONS);
-
-const ROLES: { key: string; name: string; description: string; permissions: string[] }[] = [
-  { key: "admin", name: "Admin", description: "Full access", permissions: ALL },
+const ROLES: { key: string; name: string; description: string; permissions: PermissionKey[] }[] = [
+  { key: ADMIN_ROLE_KEY, name: "Admin", description: "Full access", permissions: ALL },
   {
     key: "sales_manager",
     name: "Sales manager",
@@ -66,6 +52,13 @@ const ROLES: { key: string; name: string; description: string; permissions: stri
     name: "Agent",
     description: "Own stats and own QA results",
     permissions: ["agents.view_own", "qa.view_own"],
+  },
+  {
+    // Given to every new login. They can log in but see nothing until an admin gives a real role.
+    key: PENDING_ROLE_KEY,
+    name: "Waiting for approval",
+    description: "New user, no access yet",
+    permissions: [],
   },
 ];
 

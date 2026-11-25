@@ -109,7 +109,7 @@ Where to find each Supabase value:
 | `DIRECT_URL` | Connect → Session pooler or Direct connection (port 5432) |
 | `SUPABASE_URL`, `VITE_SUPABASE_URL` | Project Settings → API → Project URL |
 | `SUPABASE_SECRET_KEY` | Project Settings → API Keys → Secret key (server only) |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Project Settings → API Keys → Publishable key |
+| `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PUBLISHABLE_KEY` | Project Settings → API Keys → Publishable key |
 
 Replace `[YOUR-PASSWORD]` in both connection strings with the database password. The VICIdial
 values go in the root `.env` too.
@@ -161,12 +161,13 @@ values live in `apps/web/.env`. Never commit either file.
 | `VICIDIAL_SOURCE` | api, worker | Label sent with every API call |
 | `DATABASE_URL` | api, worker | Supabase transaction pooler connection (port 6543) |
 | `DIRECT_URL` | Prisma CLI | Supabase direct connection for migrations (port 5432) |
-| `SUPABASE_URL` | api | Supabase project URL |
-| `SUPABASE_SECRET_KEY` | api | Supabase secret key (server only) |
+| `SUPABASE_URL` | api | Supabase project URL; the api checks login tokens with the project's public keys (`/auth/v1/.well-known/jwks.json`) |
+| `SUPABASE_SECRET_KEY` | (not used yet) | Supabase secret key (server only). The api does not load it: each part gets only the secrets it uses |
+| `SUPABASE_PUBLISHABLE_KEY` | `dev:token` | Supabase publishable key, for the development login helper |
 | `DEEPGRAM_API_KEY` | worker | Speech to text |
 | `OPENAI_API_KEY` | worker | QA scoring |
 | `PORT` | api | API port, default 4000 |
-| `LOG_LEVEL` | worker | `debug`, `info` (default), `warn` or `error`; `debug` also shows every VICIdial request |
+| `LOG_LEVEL` | api, worker | `debug`, `info` (default), `warn` or `error`; `debug` also shows every VICIdial request |
 | `APP_TIMEZONE` / `REF_TIMEZONE` | all | Display timezones (America/New_York, Asia/Karachi) |
 | `VITE_SUPABASE_URL` | web | Supabase project URL |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | web | Supabase publishable key (safe in the browser) |
@@ -184,9 +185,15 @@ Run from the repository root.
 | `npm run db:migrate` | Applies the committed database migrations |
 | `npm run sync:once -w @vici/worker` | Runs every sync job once for today, prints a summary and exits |
 | `npm run sync:once -w @vici/worker -- --date=2026-11-24` | The same for a past day (no live floor) |
+| `npm run admin:promote -w @vici/db -- --email=person@example.com` | Makes that user an admin (they must have logged in once); writes an `audit_log` row |
+| `npm run dev:token -w @vici/api` | Development only: logs in with email and password and prints an access token for curl |
 
 Do not run `sync:once` while the worker is running: two processes means twice the load on the
 dialer.
+
+A new user who logs in gets the role `pending` (no access) until an admin gives them a role. The
+first admin is made with `admin:promote` in a terminal, never over HTTP. The token printed by
+`dev:token` is a login: never paste it anywhere.
 
 ## VICIdial integration
 
