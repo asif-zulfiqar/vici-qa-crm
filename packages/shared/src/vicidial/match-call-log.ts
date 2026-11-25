@@ -20,12 +20,14 @@ export type LogRowForMatch = {
   callStatus: string | null;
   lengthSec: number;
   hangupReason: string | null;
+  listId?: string | null;
 };
 
 export type CallLogMatch = {
   callStatus: string | null;
   lengthSec: number;
   hangupReason: string | null;
+  listId: string | null;
   callDate: Date;
   /** Seconds between recording start and the log row (0-60). */
   delaySec: number;
@@ -58,6 +60,7 @@ export function matchCallLog(
     callStatus: best.row.callStatus,
     lengthSec: best.row.lengthSec,
     hangupReason: best.row.hangupReason,
+    listId: best.row.listId ?? null,
     callDate: best.row.callDate,
     delaySec: best.delay / 1000,
   };

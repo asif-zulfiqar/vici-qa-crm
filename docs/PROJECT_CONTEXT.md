@@ -94,7 +94,10 @@ call. Recordings and transcripts kept 90 days by default.
 
 - Stack: React (Vite) + Express + Node worker, TypeScript, npm workspaces monorepo.
 - Database, login and file storage: Supabase (Postgres). Prisma for database access.
-- Queue and schedules: pg-boss (inside Postgres).
+- Sync schedules: a small in-process scheduler in the worker (one `setInterval` per job with an
+  overlap guard, intervals in `apps/worker/src/config.ts`). Only the worker calls the VICIdial
+  API, through one client. Every run is recorded in `sync_runs`.
+- Queue: pg-boss (inside Postgres), planned for the QA jobs only (transcribe, score).
 - Transcription: Deepgram (pre-recorded, diarization). QA scoring: OpenAI, structured JSON.
 - Hosting: one Linux server with a fixed IP (whitelisted on the dialer) runs api + worker
   and serves the built web app. Supabase is hosted separately.

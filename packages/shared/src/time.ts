@@ -34,6 +34,31 @@ export function toVicidialDate(date: Date = new Date()): string {
   return DateTime.fromJSDate(date, { zone: VICIDIAL_TZ }).toFormat(DATE_FORMAT);
 }
 
+/**
+ * The exact moments an Eastern day starts and ends: "2026-11-19" ->
+ * { start: 2026-11-19T05:00Z, end: 2026-11-20T05:00Z }. `end` is the start of the next day
+ * (use `< end`). A DST day is 23 or 25 hours long; Luxon handles that.
+ */
+export function vicidialDayRange(day: string): { start: Date; end: Date } {
+  const start = DateTime.fromFormat(day, DATE_FORMAT, { zone: VICIDIAL_TZ });
+  if (!start.isValid) throw new Error(`Invalid VICIdial day: "${day}"`);
+  return { start: start.toJSDate(), end: start.plus({ days: 1 }).toJSDate() };
+}
+
+/** The Eastern day before `day`: "2026-11-01" -> "2026-10-31". */
+export function previousVicidialDate(day: string): string {
+  const dt = DateTime.fromFormat(day, DATE_FORMAT, { zone: VICIDIAL_TZ });
+  if (!dt.isValid) throw new Error(`Invalid VICIdial day: "${day}"`);
+  return dt.minus({ days: 1 }).toFormat(DATE_FORMAT);
+}
+
+/** The moment it is `hour`:00 in Eastern time on `day` (e.g. 02:00 for the nightly job). */
+export function vicidialTimeOnDay(day: string, hour: number): Date {
+  const dt = DateTime.fromFormat(day, DATE_FORMAT, { zone: VICIDIAL_TZ }).set({ hour });
+  if (!dt.isValid) throw new Error(`Invalid VICIdial day: "${day}"`);
+  return dt.toJSDate();
+}
+
 /** True when the string is a real calendar day in "YYYY-MM-DD" form. */
 export function isVicidialDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && DateTime.fromFormat(value, DATE_FORMAT).isValid;

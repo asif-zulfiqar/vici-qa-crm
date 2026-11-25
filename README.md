@@ -25,7 +25,7 @@ VICIdial.
 ```
                ┌──────────────────────────── server (fixed IP) ───────────────────────────┐
  Browser ───── │  apps/api  (Express)  ── serves the web app, REST API, recording proxy       │
- (React app)   │  apps/worker (Node)   ── VICIdial sync jobs + QA jobs (pg-boss)              │
+ (React app)   │  apps/worker (Node)   ── VICIdial sync (own scheduler) + QA jobs (pg-boss)   │
                └───────────┬──────────────────────────────┬───────────────────────────────────┘
                            │                              │
                    Supabase (Postgres,            VICIdial Non-Agent API
@@ -35,7 +35,9 @@ VICIdial.
 ```
 
 - The **worker** pulls data from VICIdial on a schedule and stores it in Postgres. Every sync is
-  idempotent, so running a job twice never creates duplicates.
+  idempotent, so running a job twice never creates duplicates. The sync jobs use a small
+  in-process scheduler (`setInterval` per job, see `apps/worker/src/config.ts`); every run is
+  recorded in `sync_runs`. Only the worker calls the VICIdial API.
 - The **api** serves the React app and a REST API to it. It verifies the Supabase login token
   and the user's role on every request, and streams recordings so the browser never sees
   VICIdial URLs or credentials.
@@ -164,6 +166,7 @@ values live in `apps/web/.env`. Never commit either file.
 | `DEEPGRAM_API_KEY` | worker | Speech to text |
 | `OPENAI_API_KEY` | worker | QA scoring |
 | `PORT` | api | API port, default 4000 |
+| `LOG_LEVEL` | worker | `debug`, `info` (default), `warn` or `error`; `debug` also shows every VICIdial request |
 | `APP_TIMEZONE` / `REF_TIMEZONE` | all | Display timezones (America/New_York, Asia/Karachi) |
 | `VITE_SUPABASE_URL` | web | Supabase project URL |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | web | Supabase publishable key (safe in the browser) |
@@ -178,6 +181,12 @@ Run from the repository root.
 | `npm run typecheck` | Type-checks every workspace |
 | `npm test` | Runs the test suite |
 | `npm run build` | Builds the web app for production |
+| `npm run db:migrate` | Applies the committed database migrations |
+| `npm run sync:once -w @vici/worker` | Runs every sync job once for today, prints a summary and exits |
+| `npm run sync:once -w @vici/worker -- --date=2026-11-24` | The same for a past day (no live floor) |
+
+Do not run `sync:once` while the worker is running: two processes means twice the load on the
+dialer.
 
 ## VICIdial integration
 

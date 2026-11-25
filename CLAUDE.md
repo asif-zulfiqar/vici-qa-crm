@@ -20,7 +20,7 @@ from testing the VICIdial API on our server, and the decisions already made.
 ```
 apps/web         @vici/web     React + Vite + Tailwind + shadcn/ui + React Router + TanStack Query + Recharts
 apps/api         @vici/api     Express REST API: auth, roles, data routes, recording proxy, webhook
-apps/worker      @vici/worker  Background jobs: VICIdial sync and QA (pg-boss)
+apps/worker      @vici/worker  Background jobs: VICIdial sync (in-process scheduler), later QA (pg-boss)
 packages/shared  @vici/shared  VICIdial client, parsers, zod schemas, timezone helpers, shared types
 packages/db      @vici/db      Prisma schema, migrations and the shared Prisma client
 ```

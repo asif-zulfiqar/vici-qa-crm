@@ -3,8 +3,11 @@ import {
   fromVicidialTime,
   isVicidialDate,
   isZeroVicidialTime,
+  previousVicidialDate,
   toVicidialDate,
   toVicidialTime,
+  vicidialDayRange,
+  vicidialTimeOnDay,
 } from "../src/time";
 
 describe("Eastern <-> UTC", () => {
@@ -42,5 +45,26 @@ describe("Eastern <-> UTC", () => {
     expect(isVicidialDate("2026-11-19")).toBe(true);
     expect(isVicidialDate("2026-02-30")).toBe(false);
     expect(isVicidialDate("2026-11-19 10:27:36")).toBe(false);
+  });
+});
+
+describe("Eastern days", () => {
+  it("gives the UTC start and end of an Eastern day", () => {
+    const { start, end } = vicidialDayRange("2026-11-19");
+    expect(start.toISOString()).toBe("2026-11-19T05:00:00.000Z");
+    expect(end.toISOString()).toBe("2026-11-20T05:00:00.000Z");
+  });
+
+  it("knows the DST day is 25 hours long", () => {
+    const { start, end } = vicidialDayRange("2026-11-01");
+    expect((end.getTime() - start.getTime()) / 3_600_000).toBe(25);
+  });
+
+  it("gives the day before, across a month end", () => {
+    expect(previousVicidialDate("2026-11-01")).toBe("2026-10-31");
+  });
+
+  it("gives 02:00 Eastern on a day", () => {
+    expect(vicidialTimeOnDay("2026-11-25", 2).toISOString()).toBe("2026-11-25T07:00:00.000Z");
   });
 });

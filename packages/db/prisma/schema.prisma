@@ -225,9 +225,16 @@ model Call {
   recordingUrl String   @map("recording_url")
   campaignId   String?  @map("campaign_id")
   listId       String?  @map("list_id")
-  /// VICIdial status; may be filled in by a later sync.
-  status       String?
-  syncedAt     DateTime @updatedAt @map("synced_at") @db.Timestamptz(3)
+  /// VICIdial status of this call (from phone_number_log); filled in by a later sync.
+  status           String?
+  /// Call length from phone_number_log (length_in_sec).
+  callLengthSec    Int?      @map("call_length_sec")
+  /// AGENT or CALLER (who hung up).
+  hangupReason     String?   @map("hangup_reason")
+  /// How often the sync looked for this call's outcome without finding it (gives up at 5).
+  outcomeAttempts  Int       @default(0) @map("outcome_attempts")
+  outcomeCheckedAt DateTime? @map("outcome_checked_at") @db.Timestamptz(3)
+  syncedAt         DateTime  @updatedAt @map("synced_at") @db.Timestamptz(3)
 
   @@index([startedAt])
   @@index([vicidialUser])

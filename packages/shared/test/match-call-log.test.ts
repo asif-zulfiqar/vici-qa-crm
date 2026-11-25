@@ -29,6 +29,7 @@ describe("matchCallLog", () => {
       callStatus: "N",
       lengthSec: 22,
       hangupReason: "CALLER",
+      listId: "178",
       delaySec: 8,
     });
   });
