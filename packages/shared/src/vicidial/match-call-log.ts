@@ -18,14 +18,15 @@ export type LogRowForMatch = {
   phoneNumber: string;
   callDate: Date;
   callStatus: string | null;
-  lengthSec: number;
+  /** null when VICIdial left length_in_sec empty. */
+  lengthSec: number | null;
   hangupReason: string | null;
   listId?: string | null;
 };
 
 export type CallLogMatch = {
   callStatus: string | null;
-  lengthSec: number;
+  lengthSec: number | null;
   hangupReason: string | null;
   listId: string | null;
   callDate: Date;

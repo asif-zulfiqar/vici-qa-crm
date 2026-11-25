@@ -43,6 +43,7 @@ export type StoredRun = {
   status: string;
   rowsWritten: number;
   error: string | null;
+  notes: string | null;
 };
 
 export function createFakeStore(now: () => Date = () => new Date()) {
@@ -212,6 +213,7 @@ export function createFakeStore(now: () => Date = () => new Date()) {
         status: "running",
         rowsWritten: 0,
         error: null,
+        notes: null,
       });
       return id;
     },

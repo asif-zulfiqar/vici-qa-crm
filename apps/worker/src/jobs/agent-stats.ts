@@ -8,5 +8,5 @@ export const syncAgentStats: DayJob = async (ctx, day) => {
     (await ctx.store.upsertDailyStats(toDailyStatRows(stats, day))) +
     // No last_seen_at here: stats for a past day do not mean "seen now".
     (await ctx.store.upsertAgents(toAgentRows(stats), null));
-  return { rows, problems: [] };
+  return { rows, problems: [], notes: [] };
 };

@@ -46,5 +46,5 @@ export const syncCallbacksTransfers: DayJob = async (ctx, day) => {
     }
   }
 
-  return { rows, problems };
+  return { rows, problems, notes: [] };
 };

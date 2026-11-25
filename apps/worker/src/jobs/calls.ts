@@ -20,6 +20,7 @@ import {
 
 export const syncCalls: DayJob = async (ctx, day) => {
   const problems: string[] = [];
+  const notes: string[] = [];
   let rows = 0;
 
   for (const user of await ctx.store.agentsActiveOn(day)) {
@@ -27,8 +28,10 @@ export const syncCalls: DayJob = async (ctx, day) => {
       const recordings = await ctx.vici.recordingLookup(user, day);
       const callRows = toCallRows(recordings);
       const withoutUrl = recordings.length - callRows.length;
+      // Not an error: the URL usually appears a little later (call or upload not finished).
+      // The next run picks the recording up.
       if (withoutUrl > 0)
-        problems.push(
+        notes.push(
           `recording_lookup ${user}: ${withoutUrl} recording(s) without a URL`,
         );
       rows += await ctx.store.saveCalls(callRows);
@@ -39,7 +42,7 @@ export const syncCalls: DayJob = async (ctx, day) => {
   }
 
   rows += await fillOutcomes(ctx, problems);
-  return { rows, problems };
+  return { rows, problems, notes };
 };
 
 /** Looks up outcomes of calls without a status. Returns rows written; adds to `problems`. */

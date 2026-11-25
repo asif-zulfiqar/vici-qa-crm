@@ -5,6 +5,7 @@ import { syncCampaigns } from "../src/jobs/campaigns";
 import { syncLiveFloor } from "../src/jobs/live-floor";
 import type { Logger } from "../src/log";
 import { runJob } from "../src/run-job";
+import type { JobResult } from "../src/jobs/context";
 import { createNightlyTick, nightlyDueDay } from "../src/schedule";
 import { createScheduler, type ScheduledJob } from "../src/scheduler";
 import { fakeContext } from "./fakes";
@@ -114,7 +115,7 @@ describe("one failing job does not stop the others", () => {
       },
     });
     const scheduler = createScheduler(ctx.log);
-    const job = (name: string, work: () => Promise<{ rows: number; problems: string[] }>): ScheduledJob => ({
+    const job = (name: string, work: () => Promise<JobResult>): ScheduledJob => ({
       name,
       everyMs: 1000,
       runAtStart: true,
@@ -135,19 +136,59 @@ describe("one failing job does not stop the others", () => {
 describe("runJob", () => {
   it("stores success with the rows written", async () => {
     const { ctx, tables } = fakeContext();
-    const outcome = await runJob(ctx, "campaigns", async () => ({ rows: 4, problems: [] }));
+    const outcome = await runJob(ctx, "campaigns", async () => ({ rows: 4, problems: [], notes: [] }));
     expect(outcome).toMatchObject({ job: "campaigns", ok: true, rows: 4, error: null });
     expect(tables.runs[0]).toMatchObject({ job: "campaigns", status: "success", rowsWritten: 4, error: null });
   });
 
   it("stores problems as a failed run but keeps the rows", async () => {
     const { ctx, tables } = fakeContext();
-    await runJob(ctx, "calls", async () => ({ rows: 7, problems: ["recording_lookup 1003: api: X", "Y"] }));
+    await runJob(ctx, "calls", async () => ({
+      rows: 7,
+      problems: ["recording_lookup 1003: api: X", "Y"],
+      notes: [],
+    }));
     expect(tables.runs[0]).toMatchObject({
       status: "failed",
       rowsWritten: 7,
       error: "recording_lookup 1003: api: X; Y",
+      notes: null,
     });
+  });
+
+  it("stores notes only as success, with the notes", async () => {
+    const { ctx, tables } = fakeContext();
+    const outcome = await runJob(ctx, "calls", async () => ({
+      rows: 2,
+      problems: [],
+      notes: ["recording_lookup 1004: 1 recording(s) without a URL"],
+    }));
+    expect(outcome).toMatchObject({ ok: true, error: null, noteCount: 1 });
+    expect(tables.runs[0]).toMatchObject({
+      status: "success",
+      error: null,
+      notes: "recording_lookup 1004: 1 recording(s) without a URL",
+    });
+  });
+
+  it("stores problems and notes as failed, with both", async () => {
+    const { ctx, tables } = fakeContext();
+    await runJob(ctx, "calls", async () => ({
+      rows: 2,
+      problems: ["phone_number_log for recording 9166: parse: X"],
+      notes: ["note A", "note B"],
+    }));
+    expect(tables.runs[0]).toMatchObject({
+      status: "failed",
+      error: "phone_number_log for recording 9166: parse: X",
+      notes: "note A; note B",
+    });
+  });
+
+  it("hides phone numbers in notes", async () => {
+    const { ctx, tables } = fakeContext();
+    await runJob(ctx, "calls", async () => ({ rows: 0, problems: [], notes: ["call to 5550100001 has no URL"] }));
+    expect(tables.runs[0]!.notes).toBe("call to [number] has no URL");
   });
 
   it("removes secrets and cuts long errors to 1000 characters", async () => {
@@ -171,7 +212,7 @@ describe("runJob", () => {
     ctx.store.startRun = async () => {
       throw new Error("Can't reach database server");
     };
-    const work = vi.fn(async () => ({ rows: 1, problems: [] }));
+    const work = vi.fn(async () => ({ rows: 1, problems: [], notes: [] }));
     const outcome = await runJob(ctx, "calls", work);
     expect(outcome.ok).toBe(false);
     expect(work).not.toHaveBeenCalled();
@@ -253,6 +294,7 @@ describe("nightly", () => {
       status: "success",
       rowsWritten: 0,
       error: null,
+      notes: null,
     });
     await tick();
     expect(tables.runs).toHaveLength(1);

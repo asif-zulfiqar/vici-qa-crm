@@ -65,7 +65,8 @@ export type PendingCall = {
 export type CallOutcome = {
   status: string;
   listId: string | null;
-  callLengthSec: number;
+  /** null when VICIdial left length_in_sec empty. */
+  callLengthSec: number | null;
   hangupReason: string | null;
 };
 

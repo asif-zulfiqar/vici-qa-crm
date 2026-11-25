@@ -307,6 +307,8 @@ model SyncRun {
   status      SyncStatus @default(running)
   rowsWritten Int        @default(0) @map("rows_written")
   error       String?
+  /// Expected gaps the next run fixes (a recording without a URL yet). The run stays success.
+  notes       String?
 
   @@index([job, startedAt])
   @@map("sync_runs")

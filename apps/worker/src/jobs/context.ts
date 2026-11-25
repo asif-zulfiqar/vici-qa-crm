@@ -23,15 +23,18 @@ export type JobContext = {
 };
 
 /**
- * `rows`: rows written. `problems`: things that went wrong while the rest of the job went on
- * (for example one agent's recordings). A run with problems is stored as failed.
+ * `rows`: rows written.
+ * `problems`: things that went wrong while the rest of the job went on (for example one
+ *   agent's recordings). A run with problems is stored as failed.
+ * `notes`: expected gaps that the next run fixes by itself (a recording without a URL yet).
+ *   A run with only notes is stored as success, with the notes.
  */
-export type JobResult = { rows: number; problems: string[] };
+export type JobResult = { rows: number; problems: string[]; notes: string[] };
 
 /** A job for one US Eastern day ("YYYY-MM-DD"). */
 export type DayJob = (ctx: JobContext, day: string) => Promise<JobResult>;
 
-/** Long digit runs (phone numbers) are hidden: problems end up in logs and sync_runs. */
+/** Long digit runs (phone numbers) are hidden: problems and notes end up in logs and sync_runs. */
 export function hidePhones(text: string): string {
   return text.replace(/\d{7,}/g, "[number]");
 }

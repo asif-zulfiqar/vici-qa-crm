@@ -41,6 +41,11 @@ describe("matchCallLog", () => {
     expect(matchCallLog(recording, [row("2026-11-19 10:27:35")])).toBeNull();
   });
 
+  it("works when the log row has no length", () => {
+    const match = matchCallLog(recording, [row("2026-11-19 10:27:44", { lengthSec: null })]);
+    expect(match).toMatchObject({ callStatus: "N", lengthSec: null, delaySec: 8 });
+  });
+
   it("needs the same user", () => {
     expect(matchCallLog(recording, [row("2026-11-19 10:27:44", { user: "1003" })])).toBeNull();
   });

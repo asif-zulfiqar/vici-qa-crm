@@ -24,6 +24,7 @@ export type RunResult = {
   status: "success" | "failed";
   rowsWritten: number;
   error: string | null;
+  notes: string | null;
 };
 
 export interface SyncStore {

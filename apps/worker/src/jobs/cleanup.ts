@@ -13,5 +13,5 @@ export async function cleanupOldRows(ctx: JobContext): Promise<JobResult> {
     new Date(now - config.retention.syncRunDays * DAY_MS),
   );
   ctx.log.info({ snapshots, syncRuns: runs }, "old rows deleted");
-  return { rows: snapshots + runs, problems: [] };
+  return { rows: snapshots + runs, problems: [], notes: [] };
 }

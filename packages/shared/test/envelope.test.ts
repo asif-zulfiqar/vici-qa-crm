@@ -19,8 +19,8 @@ describe("readJsonRows", () => {
   });
 
   it("counts data.length, never the number in result_reason", () => {
-    // phone_number_log says "RECORDS FOUND: 0" but returns 4 rows.
-    expect(readJsonRows("phone_number_log", fixture("phone_number_log.json"))).toHaveLength(4);
+    // phone_number_log says "RECORDS FOUND: 0" but returns 5 rows.
+    expect(readJsonRows("phone_number_log", fixture("phone_number_log.json"))).toHaveLength(5);
   });
 
   it("turns 'not found' into an empty array", () => {

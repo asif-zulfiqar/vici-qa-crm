@@ -17,18 +17,42 @@ describe("parseDateArg", () => {
 });
 
 describe("formatSummary", () => {
+  const run = { notes: null, noteCount: 0, error: null };
+
   it("shows job, ok/FAILED, rows and seconds, and the error", () => {
     const text = formatSummary("2026-11-25", [
-      { job: "campaigns", ok: true, rows: 1, ms: 420, error: null },
-      { job: "calls", ok: false, rows: 3, ms: 61_000, error: "recording_lookup 1003: timeout" },
+      { ...run, job: "campaigns", ok: true, rows: 1, ms: 420 },
+      { ...run, job: "calls", ok: false, rows: 3, ms: 61_000, error: "recording_lookup 1003: timeout" },
     ]);
     expect(text).toBe(
       [
         "sync:once for 2026-11-25 (US Eastern)",
-        "  campaigns            ok           1 rows     0.4 s",
-        "  calls                FAILED       3 rows    61.0 s",
+        "  campaigns            ok                    1 rows     0.4 s",
+        "  calls                FAILED                3 rows    61.0 s",
         "      recording_lookup 1003: timeout",
         "1 job(s) failed",
+      ].join("\n"),
+    );
+  });
+
+  it("shows notes on an ok job, and all jobs are still ok", () => {
+    const text = formatSummary("2026-11-25", [
+      {
+        ...run,
+        job: "calls",
+        ok: true,
+        rows: 62,
+        ms: 33_400,
+        notes: "recording_lookup 1004: 1 recording(s) without a URL",
+        noteCount: 1,
+      },
+    ]);
+    expect(text).toBe(
+      [
+        "sync:once for 2026-11-25 (US Eastern)",
+        "  calls                ok (1 note)          62 rows    33.4 s",
+        "      note: recording_lookup 1004: 1 recording(s) without a URL",
+        "all jobs ok",
       ].join("\n"),
     );
   });

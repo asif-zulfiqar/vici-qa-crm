@@ -7,5 +7,6 @@ export async function syncCampaigns(ctx: JobContext): Promise<JobResult> {
   return {
     rows: await ctx.store.upsertCampaigns(toCampaignRows(campaigns)),
     problems: [],
+    notes: [],
   };
 }

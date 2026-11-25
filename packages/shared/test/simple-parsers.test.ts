@@ -30,8 +30,8 @@ describe("parseCallidInfo", () => {
 describe("parsePhoneNumberLog", () => {
   const rows = parsePhoneNumberLog(fixture("phone_number_log.json"));
 
-  it("returns all 4 rows although result_reason says 0", () => {
-    expect(rows).toHaveLength(4);
+  it("returns all 5 rows although result_reason says 0", () => {
+    expect(rows).toHaveLength(5);
   });
 
   it("reads each call's own status, length and hangup reason", () => {
@@ -43,5 +43,14 @@ describe("parsePhoneNumberLog", () => {
       hangupReason: "CALLER",
     });
     expect(rows[2]!.callDate.toISOString()).toBe("2026-11-19T15:27:44.000Z");
+  });
+
+  it("reads an empty length_in_sec as null (seen on real rows)", () => {
+    expect(rows[4]).toMatchObject({ user: "1007", callStatus: "N", lengthSec: null });
+  });
+
+  it("still rejects a length that is not a number", () => {
+    const body = fixture("phone_number_log.json").replace('"length_in_sec":"22"', '"length_in_sec":"abc"');
+    expect(() => parsePhoneNumberLog(body)).toThrow("length_in_sec");
   });
 });

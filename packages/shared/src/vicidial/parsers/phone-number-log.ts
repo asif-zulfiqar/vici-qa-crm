@@ -2,14 +2,15 @@
 // call_status is the disposition of THAT call (lead_status is the lead's status now).
 import { z } from "zod";
 import { parseRows, readJsonRows } from "../envelope";
-import { num, text, vicidialTime } from "../zod-helpers";
+import { numOrNull, text, vicidialTime } from "../zod-helpers";
 
 const logRowSchema = z
   .looseObject({
     phone_number: z.string().min(1),
     call_date: vicidialTime,
     list_id: text,
-    length_in_sec: num,
+    // Empty on some real rows (seen 2026-11-25), so "" -> null. Every other field stays strict.
+    length_in_sec: numOrNull,
     lead_status: text,
     hangup_reason: text,
     call_status: text,

@@ -84,6 +84,10 @@ call. Recordings and transcripts kept 90 days by default.
   URL host is a raw IP over https: `https://<ip>/RECORDINGS/MP3/YYYYMMDD-HHMMSS_<phone>-all.mp3`.
   Agent 1004: 35 calls and 35 recordings on 19 Nov → every call is recorded.
   A lead can have several recordings; a call's identity is `recording_id`.
+  A recording can come back without a URL for a while (call or upload not finished): the
+  next sync picks it up, so the worker records this as a note, not a failure.
+- `phone_number_log`: `length_in_sec` can be empty on real rows (seen 25 Nov), so it is
+  parsed as "" → null. Every other field stays strictly checked.
 - `lead_callback_info`: `CALLBACK NOT FOUND` when the lead has no callback (not a failure).
 - Status codes seen: N (no answer), CALLBK, GVM, DAIR (dead air), A (answering machine),
   DNC, NI, INCALL, B, DC, DEC, NP, PVM. Success = XFER (transferred). GVM and PVM are

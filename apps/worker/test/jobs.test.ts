@@ -14,6 +14,7 @@ import { syncCampaigns } from "../src/jobs/campaigns";
 import { cleanupOldRows } from "../src/jobs/cleanup";
 import { syncLiveFloor } from "../src/jobs/live-floor";
 import type { SnapshotRow } from "../src/rows";
+import { runJob } from "../src/run-job";
 import { fakeContext } from "./fakes";
 import { fixture } from "./helpers";
 
@@ -37,7 +38,7 @@ describe("live-floor", () => {
   it("writes one snapshot per agent and upserts the agents", async () => {
     const { ctx, tables } = fakeContext({ now: NOW });
     const result = await syncLiveFloor(ctx);
-    expect(result).toEqual({ rows: 6, problems: [] });
+    expect(result).toEqual({ rows: 6, problems: [], notes: [] });
     expect([...tables.agents.keys()]).toEqual(["1001", "1005", "1003"]);
     expect(tables.agents.get("1005")!.lastSeenAt).toEqual(NOW);
   });
@@ -54,7 +55,7 @@ describe("live-floor", () => {
     const { ctx, tables } = fakeContext({
       vici: { loggedInAgents: async () => [] },
     });
-    expect(await syncLiveFloor(ctx)).toEqual({ rows: 0, problems: [] });
+    expect(await syncLiveFloor(ctx)).toEqual({ rows: 0, problems: [], notes: [] });
     expect(tables.snapshots.size).toBe(0);
   });
 });
@@ -157,6 +158,34 @@ describe("calls", () => {
       "recording_lookup 1003: api: SOMETHING WENT WRONG",
     ]);
     expect(tables.calls.size).toBe(3);
+  });
+
+  it("gives a note, not a problem, for a recording without a URL yet", async () => {
+    const recordings = parseRecordingLookup(fixture("recording_lookup.json"));
+    const { ctx, tables } = await setup({
+      recordingLookup: async (user: string) =>
+        user === "1004"
+          ? recordings.map((r) =>
+              r.recordingId === "7557" ? { ...r, url: null } : r,
+            )
+          : [],
+    });
+
+    const result = await syncCalls(ctx, DAY);
+    expect(result.problems).toEqual([]);
+    expect(result.notes).toEqual([
+      "recording_lookup 1004: 1 recording(s) without a URL",
+    ]);
+    // The other recordings are saved; 7557 comes on a later run.
+    expect([...tables.calls.keys()].sort()).toEqual(["7485", "7556"]);
+
+    const outcome = await runJob(ctx, "calls", () => syncCalls(ctx, DAY));
+    expect(outcome).toMatchObject({ ok: true, noteCount: 1, error: null });
+    expect(tables.runs[0]).toMatchObject({
+      status: "success",
+      error: null,
+      notes: "recording_lookup 1004: 1 recording(s) without a URL",
+    });
   });
 
   it("does not use up tries when the dialer cannot be reached", async () => {
@@ -321,6 +350,7 @@ describe("cleanup", () => {
         status: "success",
         rowsWritten: 1,
         error: null,
+        notes: null,
       },
       {
         id: 2,
@@ -329,9 +359,10 @@ describe("cleanup", () => {
         status: "success",
         rowsWritten: 1,
         error: null,
+        notes: null,
       },
     );
-    expect(await cleanupOldRows(ctx)).toEqual({ rows: 2, problems: [] });
+    expect(await cleanupOldRows(ctx)).toEqual({ rows: 2, problems: [], notes: [] });
     expect(tables.snapshots.size).toBe(1);
     expect(tables.runs.map((r) => r.id)).toEqual([2]);
   });
