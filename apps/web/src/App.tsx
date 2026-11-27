@@ -1,19 +1,30 @@
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+// The routes of the dashboard. See src/auth/guards.tsx for who may see what.
+import { createBrowserRouter, RouterProvider } from "react-router";
+import { PendingRoute, PublicOnly, RequireAccount, RequireSession } from "@/auth/guards";
+import { HomePage } from "@/pages/home/home-page";
+import { LoginPage } from "@/pages/login/login-page";
+import { NotFoundPage } from "@/pages/not-found/not-found-page";
+
+const router = createBrowserRouter([
+  {
+    element: <PublicOnly />,
+    children: [{ path: "/login", element: <LoginPage /> }],
+  },
+  {
+    element: <RequireSession />,
+    children: [
+      { path: "/pending", element: <PendingRoute /> },
+      {
+        element: <RequireAccount />,
+        children: [
+          { path: "/", element: <HomePage /> },
+          { path: "*", element: <NotFoundPage /> },
+        ],
+      },
+    ],
+  },
+]);
 
 export default function App() {
-  const [health, setHealth] = useState("checking...");
-  useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then((d) => setHealth(d.ok ? "API OK" : "API error"))
-      .catch(() => setHealth("API not reachable"));
-  }, []);
-  return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-4">
-      <h1 className="text-2xl font-semibold">vici-qa-crm</h1>
-      <p>{health}</p>
-      <Button>shadcn works</Button>
-    </div>
-  );
+  return <RouterProvider router={router} />;
 }

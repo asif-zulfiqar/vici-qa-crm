@@ -247,6 +247,9 @@ keys Task 05 needs:
 | `hr.allowed_break_minutes` | integer 0–480 | `60` |
 | `qa.min_call_length_sec` | integer 0–3600 | `60` |
 
+**Changed on 26 Nov:** the four `hr.*` keys above are replaced by one per-team key
+`hr.shifts`. See "Changes after the owner's roadmap" near the end.
+
 `GET` returns every registry key with its current value (or the default) and description.
 
 ## Code layout
@@ -334,10 +337,100 @@ Test users are made in Supabase → Authentication → Users → Add user (auto-
      you can jump forward.
 - `audit_log` has rows for the promote, the override and the audio link.
 
+## Changes after the owner's roadmap (26 Nov)
+
+The owner's roadmap (`LeapsDev QA Module: Features & Roadmap`, 25 Nov) asks for four things
+that belong in this task. They change Steps 1, 2 and 4 of the plan.
+
+### 1. Phone numbers and lead IDs are masked by default (roadmap I7)
+
+- New permission `calls.view_pii`: "See full phone numbers and lead IDs".
+- Without it, every response shows the phone as its last 4 digits (`•••-•••-2100`) and the
+  lead id as `null` with `leadMasked: true`. This applies to the call list, call detail,
+  number history and (in Task 05) every report and CSV.
+- Mask in ONE place (a pure function used by every service that returns calls), and test it.
+- The database keeps the full number: the worker needs it to find each call's disposition.
+
+### 2. A team lead sees only their own team (roadmap A8)
+
+- New permission `data.all_teams`: "See every team, not only your own".
+- Without it, live floor, agents and calls only include agents whose `user_group` equals the
+  profile's `team`. A profile without a team then sees nothing (deny by default).
+- Combine with "own" rules: `agents.view_own` stays the narrowest (only yourself).
+- One pure function decides the agent scope for a request; every data service uses it.
+
+### Seed rules for the two new permissions
+
+- Default roles: `calls.view_pii` → admin, qa. `data.all_teams` → admin, sales_manager, hr, qa.
+  (`team_lead` and `agent` do not get it.)
+- A permission that is NEW in the database is added to its default roles. A permission that
+  already existed is never re-added to a role (an admin may have removed it on purpose).
+
+### 3. Sub-dispositions (roadmap D4, E4)
+
+**Changed on 26 Nov (later the same night): NOT in this task.** Only 2–3 days are left for the
+non-QA part, and sub-dispositions are needed first by the AI disposition tree, so they move to
+the QA task. Skip this section and its test. The text stays here as the plan for later.
+
+New migration (never edit an applied one): `outcome_categories.parent_id` (nullable, refers
+to `outcome_categories.id`, `ON DELETE RESTRICT`).
+
+- Only one level: a category with a parent cannot have children (check in the API, 400).
+- A status mapping can point to a parent or a child. Reports can group by either.
+- `GET /api/admin/outcome-categories` returns the tree (parents with their children).
+- `POST` and `PATCH` accept `parentId`. Moving a parent under another parent is refused if it
+  has children.
+
+### 4. Shift settings per team (roadmap G5)
+
+Replace the four `hr.*` keys in the settings registry with one key:
+
+| Key | Type | Default |
+|---|---|---|
+| `hr.shifts` | map of team (user group) → `{ startEastern "HH:MM", lateGraceMinutes 0–120, allowedBreakMinutes 0–480, breakPauseCodes string[] }`; key `"*"` is the default for teams not listed | `{ "*": { "startEastern": "09:00", "lateGraceMinutes": 10, "allowedBreakMinutes": 60, "breakPauseCodes": [] } }` |
+
+`"*"` must always exist (400 if a `PUT` removes it).
+
+### Extra tests
+
+- Masking: with and without `calls.view_pii`, on list, detail and number history.
+- Team scope: team lead sees only their user group; without a team, nothing; admin sees all.
+- Seed: a new permission goes to its default roles; running the seed again after an admin
+  removed it does not add it back.
+- Sub-dispositions: a third level is refused; the tree comes back nested. (Skip: moved to the
+  QA task, see section 3.)
+- `hr.shifts` without `"*"` → 400.
+
+## Changes after the final scope (27 Nov)
+
+The owner's final scope is `docs/owner/final-scope-2026-11-25.pdf`. For this task it
+changes one thing: how recordings are fetched.
+
+### Recording host: use the server's name, not its IP
+
+Recording URLs in `calls.recording_url` start with the raw IP of the dialer
+(`https://88.99.213.116/RECORDINGS/...`). That server's HTTPS certificate is issued for its
+name, `dialer4.dialergiants.com`, so a secure request to the IP fails. Checked on 27 Nov:
+the name resolves to the same IP, and HTTPS to the name works.
+
+- New env value `RECORDING_HOST_MAP`, for example `88.99.213.116=dialer4.dialergiants.com`
+  (comma-separated pairs). Before fetching a recording, the API replaces a mapped host with its
+  name. Then the `RECORDING_HOSTS` check runs on the name.
+- `RECORDING_HOSTS=dialer4.dialergiants.com`
+- TLS checks stay fully on. Never add `rejectUnauthorized: false` or similar.
+- Test: a mapped IP is rewritten; an unmapped IP fails the host check (502).
+
+Everything else from the final scope goes to Tasks 03c, 05 and 06.
+
 ## Not in this task
 
-- Report routes (dispositions R9, results R10, callbacks R11, HR R12) and CSV export R19:
-  Task 05.
+- Report routes (dispositions R9, results R10, callbacks R11, HR R12, calls per hour, talk per
+  call vs per logged-in hour, utilisation, time sheet) and CSV export R19: Task 05.
+- Worker additions from the roadmap (campaign, list and lead source per call; nightly check
+  against `call_dispo_report`; marking days with missing snapshots; warning at the 2,000-row
+  limit of `lead_status_search`): Task 03c, after this task.
 - How accounts are created (sign up or admin invite) and emails: decided with the owner later.
-- A team lead seeing only their own team: open question for the owner.
+- ~~A team lead seeing only their own team: open question for the owner.~~ Changed on 26 Nov:
+  now in this task (section 2 above), because the owner's roadmap asks for it (A8).
+- Sub-dispositions: QA task (section 3 above).
 - QA (R13–R18): later task.

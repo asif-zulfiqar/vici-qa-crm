@@ -13,3 +13,8 @@ Each task file in this folder is one unit of work. For every task:
    tests or fixtures.
 6. If the current docs of a library differ from what the task says, follow the current docs
    and tell me what you changed.
+7. Never commit, push, create branches or switch branches. Leave the changes in the working
+   tree and give me the suggested commit message; I review, commit and push myself.
+   (Added 26 Nov after Task 04 Step 1 was committed on a new branch.)
+8. Task files are a record we learn from. When a plan changes, add a dated note next to the
+   old text ("Changed on 26 Nov: ..."). Never delete the old text.
