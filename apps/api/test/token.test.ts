@@ -71,16 +71,60 @@ describe("verifyAccessToken", () => {
 });
 
 describe("env", () => {
+  /** Placeholder values only. */
+  const SECRET_HEX = "ab".repeat(32);
+  const base = {
+    DATABASE_URL: "postgresql://x",
+    SUPABASE_URL: `${SUPABASE_URL}/`,
+    AUDIO_LINK_SECRET: SECRET_HEX,
+    RECORDING_HOSTS: "recordings.example.test",
+  };
+
   it("names missing variables, never values, and does not need SUPABASE_SECRET_KEY", () => {
-    expect(() => loadEnv({ DATABASE_URL: "postgresql://x", SUPABASE_URL: "not a url" })).toThrow(
+    expect(() => loadEnv({ ...base, SUPABASE_URL: "not a url" })).toThrow(
       "check these variables in the root .env: SUPABASE_URL",
     );
-    expect(loadEnv({ DATABASE_URL: "postgresql://x", SUPABASE_URL: `${SUPABASE_URL}/` })).toEqual({
+    expect(loadEnv(base)).toEqual({
       DATABASE_URL: "postgresql://x",
       SUPABASE_URL,
       PORT: 4000,
       LOG_LEVEL: "info",
+      AUDIO_LINK_SECRET: Buffer.from(SECRET_HEX, "hex"),
+      RECORDING_HOSTS: new Set(["recordings.example.test"]),
+      RECORDING_HOST_MAP: new Map(),
     });
+  });
+
+  it("reads the recording hosts and the IP -> name map", () => {
+    const env = loadEnv({
+      ...base,
+      RECORDING_HOSTS: " Recordings.example.test, b.example.test ",
+      RECORDING_HOST_MAP: "203.0.113.10=recordings.example.test",
+    });
+    expect(env.RECORDING_HOSTS).toEqual(new Set(["recordings.example.test", "b.example.test"]));
+    expect(env.RECORDING_HOST_MAP).toEqual(new Map([["203.0.113.10", "recordings.example.test"]]));
+  });
+
+  it("refuses a bad audio secret or host setting, without printing the value", () => {
+    const cases: [Record<string, string | undefined>, string][] = [
+      [{ AUDIO_LINK_SECRET: undefined }, "AUDIO_LINK_SECRET"],
+      [{ AUDIO_LINK_SECRET: "cd".repeat(16) }, "AUDIO_LINK_SECRET"], // 32 hex = too short
+      [{ AUDIO_LINK_SECRET: "zz".repeat(32) }, "AUDIO_LINK_SECRET"],
+      [{ RECORDING_HOSTS: undefined }, "RECORDING_HOSTS"],
+      [{ RECORDING_HOSTS: " , " }, "RECORDING_HOSTS"],
+      [{ RECORDING_HOSTS: "https://recordings.example.test" }, "RECORDING_HOSTS"],
+      [{ RECORDING_HOST_MAP: "203.0.113.10" }, "RECORDING_HOST_MAP"],
+      [{ RECORDING_HOST_MAP: "203.0.113.10=a=b" }, "RECORDING_HOST_MAP"],
+    ];
+    for (const [change, name] of cases) {
+      let message = "";
+      try {
+        loadEnv({ ...base, ...change });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message, JSON.stringify(change)).toBe(`check these variables in the root .env: ${name}`);
+    }
   });
 });
 

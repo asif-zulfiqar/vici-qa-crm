@@ -7,7 +7,9 @@ import { pino } from "pino";
 import type { PermissionsDb } from "@vici/db";
 import { createApp, type AppDeps } from "../src/app";
 import { InvalidToken, type TokenVerifier } from "../src/auth/token";
+import type { AudioDeps } from "../src/routes/audio";
 import { createAccessService } from "../src/services/access";
+import type { RecordingFetch, StoredRecording } from "../src/services/recordings";
 import { createFakeStore, emptyData, type FakeData } from "./fake-store";
 
 export const silentLogger = pino({ level: "silent" });
@@ -128,6 +130,55 @@ export function createFakeDb() {
   return { db, tables, addProfile };
 }
 
+/** Test-only audio link secret (32 bytes). */
+export const AUDIO_SECRET = Buffer.alloc(32, 7);
+
+/** Documentation IP (RFC 5737) mapped to a test name, like the dialer's IP -> name. */
+export const RECORDING_IP = "203.0.113.10";
+export const RECORDING_HOST = "recordings.example.test";
+
+/** A stored recording URL like VICIdial's (raw IP, masked phone in the file name). */
+export const recordingUrl = (host = RECORDING_IP) =>
+  `https://${host}/RECORDINGS/MP3/20261125-100000_5550100001-all.mp3`;
+
+/** What the fake recording server was asked. */
+export type UpstreamRequest = { url: URL; range: string | null; signal: AbortSignal };
+
+/**
+ * Audio dependencies with an in-memory recording table, a list of audit rows and a fake
+ * recording server that answers with `answer` (default: it cannot be reached).
+ */
+export function fakeAudio(
+  recordings: StoredRecording[] = [],
+  answer: (request: UpstreamRequest) => Response | Promise<Response> = () => {
+    throw new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } });
+  },
+  options: { firstByteTimeoutMs?: number } = {},
+) {
+  const listens: { actorId: string; recordingId: string }[] = [];
+  const upstream: UpstreamRequest[] = [];
+  const fetch: RecordingFetch = async (url, init) => {
+    const request = { url, ...init };
+    upstream.push(request);
+    return answer(request);
+  };
+  const deps: AudioDeps = {
+    store: {
+      async recording(recordingId) {
+        return recordings.find((r) => r.recordingId === recordingId) ?? null;
+      },
+      async logListen(entry) {
+        listens.push(entry);
+      },
+    },
+    secret: AUDIO_SECRET,
+    hosts: { allowed: new Set([RECORDING_HOST]), map: new Map([[RECORDING_IP, RECORDING_HOST]]) },
+    fetch,
+    ...options,
+  };
+  return { deps, listens, upstream };
+}
+
 /**
  * The app with fake login, a fake database and the standard test users: admin (no team),
  * agent 1004, an inactive admin, a manager (every team, full phones), a team lead of team
@@ -145,6 +196,7 @@ export function testApp(overrides: Partial<AppDeps> = {}, data: FakeData = empty
     verifyToken: fakeVerifier,
     access: createAccessService(fake.db),
     store: createFakeStore(data),
+    audio: fakeAudio().deps,
     logger: silentLogger,
     now: () => NOW,
     ...overrides,

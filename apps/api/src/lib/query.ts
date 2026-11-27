@@ -12,6 +12,10 @@ export const day = z.string().refine(isVicidialDate, "must be a day as YYYY-MM-D
 /** A short id or name filter (agent, team, campaign, status, outcome). */
 export const text = z.string().trim().min(1, "must not be empty").max(64, "is too long");
 
+/** A call's id (calls.recording_id): VICIdial's recording id. */
+export const RECORDING_ID = /^[A-Za-z0-9_-]{1,40}$/;
+export const recordingIdParams = z.object({ recordingId: z.string().regex(RECORDING_ID, "is not a recording id") });
+
 export const pageFields = {
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),

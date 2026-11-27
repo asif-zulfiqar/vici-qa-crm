@@ -4,6 +4,7 @@
 // Order of every request:
 //   helmet -> request log (request id) -> rate limit (/api) -> JSON body (100 kb)
 //   -> /api/health (public)
+//   -> /api/audio/:token (no login: the signed token is the permission, see routes/audio.ts)
 //   -> requireAuth (401) -> loadAccess -> route permission (403) -> handler
 //   -> error handler (one JSON shape)
 import express from "express";
@@ -18,6 +19,7 @@ import { createProtectedRoutes, type RouteInfo } from "./http/route";
 import { loadAccess } from "./middleware/load-access";
 import { requireAuth } from "./middleware/require-auth";
 import { agentRoutes } from "./routes/agents";
+import { audioLinkRoutes, audioStreamHandler, type AudioDeps } from "./routes/audio";
 import { callRoutes } from "./routes/calls";
 import { liveFloorRoutes } from "./routes/live-floor";
 import { meRoutes } from "./routes/me";
@@ -30,6 +32,8 @@ export type AppDeps = {
   access: AccessService;
   /** Database reads of the data routes. */
   store: ReadStore;
+  /** Recording links and the recording server. */
+  audio: AudioDeps;
   logger: Logger;
   /** The clock (tests pass a fixed time). */
   now?: () => Date;
@@ -62,13 +66,16 @@ export function createApp(deps: AppDeps): { app: express.Express; routes: RouteI
     res.json(body);
   });
 
+  const data = { store: deps.store, now: deps.now ?? (() => new Date()) };
+  app.get("/api/audio/:token", audioStreamHandler({ ...data, access: deps.access, audio: deps.audio }));
+
   // Everything else under /api needs a login and names its permission.
   const { router, r, routes } = createProtectedRoutes();
-  const data = { store: deps.store, now: deps.now ?? (() => new Date()) };
   meRoutes(r);
   liveFloorRoutes(r, data);
   agentRoutes(r, data);
   callRoutes(r, data);
+  audioLinkRoutes(r, data, deps.audio);
   syncRoutes(r, data);
 
   app.use("/api", requireAuth(deps.verifyToken), loadAccess(deps.access), router);

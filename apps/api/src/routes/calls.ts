@@ -8,13 +8,22 @@ import { z } from "zod";
 import type { CallDetailResponse, CallItem, CallsResponse } from "@vici/shared";
 import { agentScope } from "../lib/agent-scope";
 import { presentContact } from "../lib/mask";
-import { addDayRange, checkDayRange, dayRangeFields, iso, pageFields, pageWindow, text } from "../lib/query";
+import {
+  addDayRange,
+  checkDayRange,
+  dayRangeFields,
+  iso,
+  pageFields,
+  pageWindow,
+  recordingIdParams,
+  text,
+} from "../lib/query";
 import { createOutcomeResolver, outcomeConditions, type OutcomeMapping } from "../lib/resolve-outcome";
 import { notFound } from "../http/errors";
 import type { RouteRegistrar } from "../http/route";
 import { parseInput } from "../http/validate";
 import type { CallRecord, ReadStore } from "../services/read-store";
-import { allowedUsers } from "../services/scope";
+import { allowedUsers, isInScope } from "../services/scope";
 import type { DataDeps } from "./data-deps";
 
 export const MAX_OTHER_CALLS = 50;
@@ -33,8 +42,6 @@ const listQuery = z
   })
   .superRefine(checkDayRange)
   .transform(addDayRange);
-
-const detailParams = z.object({ recordingId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, "is not a recording id") });
 
 /**
  * Loads the outcome mappings and status names once per request and returns a function that
@@ -83,11 +90,11 @@ export function callRoutes(r: RouteRegistrar, { store }: DataDeps): void {
   });
 
   r.get("/calls/:recordingId", "calls.view", async (req, res, { access }) => {
-    const { recordingId } = parseInput(detailParams, req.params, "params");
+    const { recordingId } = parseInput(recordingIdParams, req.params, "params");
     const users = await allowedUsers(store, agentScope(access));
     const call = await store.call(recordingId);
     // A call outside the user's scope looks the same as a call that does not exist.
-    if (!call || (users !== null && !users.includes(call.vicidialUser))) throw notFound("no such call");
+    if (!call || !isInScope(users, call.vicidialUser)) throw notFound("no such call");
     const { present } = await callPresenter(store, access.permissions.has("calls.view_pii"));
     const others = call.phone ? await store.callsToPhone(call.phone, users, call.recordingId, MAX_OTHER_CALLS) : [];
     const body: CallDetailResponse = { call: present(call), otherCalls: others.map(present) };

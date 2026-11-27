@@ -6,10 +6,14 @@ import type { AuthUser } from "../auth/token";
 export interface AccessService {
   /** Loads the caller's access. Creates a `pending` profile on their first request. */
   load(user: AuthUser): Promise<Access>;
+  /** Reads a user's access without creating anything (audio links). null: no such profile. */
+  get(userId: string): Promise<Access | null>;
 }
 
 export function createAccessService(db: PermissionsDb): AccessService {
   return {
+    get: (userId) => getAccess(userId, db),
+
     async load(user) {
       const existing = await getAccess(user.userId, db);
       if (existing) return existing;

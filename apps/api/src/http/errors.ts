@@ -29,6 +29,9 @@ export const forbidden = (message = "you do not have permission for this") =>
   new HttpError(403, "forbidden", message);
 export const notFound = (message = "not found") => new HttpError(404, "not_found", message);
 export const conflict = (message: string) => new HttpError(409, "conflict", message);
+/** The recording server failed. Never says why (no URL, no host): that goes to the log only. */
+export const badGateway = (message = "the recording server did not answer, try again later") =>
+  new HttpError(502, "bad_gateway", message);
 
 type ErrorBody = ApiError;
 

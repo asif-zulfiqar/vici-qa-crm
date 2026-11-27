@@ -3,6 +3,9 @@
 import { intersectUsers, type AgentScope } from "../lib/agent-scope";
 import type { ReadStore } from "./read-store";
 
+/** Is one agent inside the result of allowedUsers? */
+export const isInScope = (users: string[] | null, vicidialUser: string) => users === null || users.includes(vicidialUser);
+
 export async function allowedUsers(
   store: Pick<ReadStore, "teamMembers">,
   scope: AgentScope,

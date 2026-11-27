@@ -199,6 +199,7 @@ describe("errors and limits", () => {
           load: async () => {
             throw new Error("connect ECONNREFUSED db.internal:5432 password=secret");
           },
+          get: async () => null,
         },
       }).app,
     );

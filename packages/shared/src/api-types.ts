@@ -21,7 +21,9 @@ export type ApiErrorCode =
   | "conflict"
   | "payload_too_large"
   | "too_many_requests"
-  | "internal";
+  | "internal"
+  /** The recording server did not answer as expected (audio stream). */
+  | "bad_gateway";
 
 /** Every error response. `issues` only on 400 (where and what, never the value). */
 export type ApiError = {
@@ -169,6 +171,13 @@ export type CallsResponse = Paged<CallItem>;
 
 /** GET /api/calls/:recordingId. `otherCalls`: same phone, newest first, at most 50. */
 export type CallDetailResponse = { call: CallItem; otherCalls: CallItem[] };
+
+/**
+ * POST /api/calls/:recordingId/audio-link (needs `calls.listen`).
+ * Put `url` ("/api/audio/<token>") in `<audio src>`. It works for 5 minutes and only for this
+ * user. Ask for a new link after `expiresAt`, or when playback fails with 403.
+ */
+export type AudioLinkResponse = { url: string; expiresAt: string };
 
 // ---------------------------------------------------------------------------
 // Sync health (R23)

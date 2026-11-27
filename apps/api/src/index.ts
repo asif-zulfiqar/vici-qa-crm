@@ -9,6 +9,7 @@ import { createTokenVerifier } from "./auth/token";
 import { loadEnv, type ApiEnv } from "./env";
 import { createAccessService } from "./services/access";
 import { createPrismaReadStore } from "./services/read-store";
+import { createPrismaRecordingStore, fetchRecording } from "./services/recordings";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -25,6 +26,12 @@ const { app } = createApp({
   verifyToken: createTokenVerifier({ supabaseUrl: env.SUPABASE_URL }),
   access: createAccessService(prisma),
   store: createPrismaReadStore(prisma),
+  audio: {
+    store: createPrismaRecordingStore(prisma),
+    secret: env.AUDIO_LINK_SECRET,
+    hosts: { allowed: env.RECORDING_HOSTS, map: env.RECORDING_HOST_MAP },
+    fetch: fetchRecording,
+  },
   logger,
 });
 
