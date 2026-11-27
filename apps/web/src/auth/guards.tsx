@@ -3,12 +3,17 @@
 //   /login            <PublicOnly>      logged in already -> back to the app
 //   /pending          <RequireSession>  -> <PendingRoute>   ready account -> the app
 //   everything else   <RequireSession>  -> <RequireAccount> pending or inactive -> /pending
+//   each page         <RequirePermission anyOf=[...]>       missing -> "You do not have access"
+import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { ErrorState, FullPageLoader } from "@/components/page-state";
 import { Button } from "@/components/ui/button";
+import { firstAllowedPath } from "@/lib/nav";
+import { hasAny, type WebPermission } from "@/lib/permissions";
+import { NoAccessPage } from "@/pages/no-access/no-access-page";
 import { PendingPage } from "@/pages/pending/pending-page";
 import { accountState, safeReturnPath } from "./account-state";
-import { MeContext, useAuth } from "./auth-context";
+import { MeContext, useAuth, useCurrentUser } from "./auth-context";
 import { useMe } from "./use-me";
 
 type ReturnState = { from?: string } | null;
@@ -55,6 +60,20 @@ export function RequireAccount() {
       <Outlet />
     </MeContext.Provider>
   );
+}
+
+/** A page that needs any one of `anyOf`. Without it: the "no access" message, not the page. */
+export function RequirePermission({ anyOf, children }: { anyOf: readonly WebPermission[]; children: ReactNode }) {
+  const me = useCurrentUser();
+  if (!hasAny(me.permissions, anyOf)) return <NoAccessPage />;
+  return children;
+}
+
+/** "/" opens the first page in the menu this user may see. */
+export function StartRedirect() {
+  const path = firstAllowedPath(useCurrentUser().permissions);
+  if (!path) return <NoAccessPage noPages />;
+  return <Navigate to={path} replace />;
 }
 
 export function PendingRoute() {
