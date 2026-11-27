@@ -1,19 +1,13 @@
 // Every schedule and limit of the worker in one place, so they are easy to find and change.
 // VICIdial has no rate limit or caching: never poll anything faster than every 30 seconds.
+import { syncJobIntervalsMs } from "@vici/shared";
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
-const HOUR = 60 * MINUTE;
 
 export const config = {
-  /** How often each sync job runs. */
-  intervalsMs: {
-    liveFloor: 30 * SECOND,
-    agentStats: 5 * MINUTE,
-    calls: 10 * MINUTE,
-    callbacksTransfers: 15 * MINUTE,
-    campaigns: 6 * HOUR,
-  },
+  /** How often each sync job runs. Kept in @vici/shared: the api's sync health page needs them too. */
+  intervalsMs: syncJobIntervalsMs,
 
   nightly: {
     /** Re-sync yesterday once a day, any time after this hour (US Eastern). */

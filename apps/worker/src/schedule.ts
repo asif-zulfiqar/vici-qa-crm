@@ -1,4 +1,4 @@
-// Which job runs when. Intervals come from config.ts.
+// Which job runs when. Intervals come from config.ts (which takes them from @vici/shared).
 import { previousVicidialDate, toVicidialDate, vicidialTimeOnDay } from "@vici/shared";
 import { config } from "./config";
 import { syncAgentStats } from "./jobs/agent-stats";
@@ -67,10 +67,10 @@ export function buildSchedule(ctx: JobContext, scheduler: Scheduler, secrets: re
 
   return [
     job("campaigns", every.campaigns, () => syncCampaigns(ctx)),
-    job("live-floor", every.liveFloor, () => syncLiveFloor(ctx)),
-    job("agent-stats", every.agentStats, () => syncAgentStats(ctx, today())),
+    job("live-floor", every["live-floor"], () => syncLiveFloor(ctx)),
+    job("agent-stats", every["agent-stats"], () => syncAgentStats(ctx, today())),
     job("calls", every.calls, () => syncCalls(ctx, today())),
-    job("callbacks-transfers", every.callbacksTransfers, () => syncCallbacksTransfers(ctx, today())),
+    job("callbacks-transfers", every["callbacks-transfers"], () => syncCallbacksTransfers(ctx, today())),
     {
       name: "nightly",
       everyMs: config.nightly.checkEveryMs,

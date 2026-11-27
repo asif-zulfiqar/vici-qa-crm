@@ -1,12 +1,12 @@
 // Scheduler, run-job and nightly, with fake timers, a fake client and a fake store.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VicidialError } from "@vici/shared";
+import { SYNC_JOB_NAMES, VicidialError } from "@vici/shared";
 import { syncCampaigns } from "../src/jobs/campaigns";
 import { syncLiveFloor } from "../src/jobs/live-floor";
 import type { Logger } from "../src/log";
 import { runJob } from "../src/run-job";
 import type { JobResult } from "../src/jobs/context";
-import { createNightlyTick, nightlyDueDay } from "../src/schedule";
+import { buildSchedule, createNightlyTick, DAY_JOBS, nightlyDueDay } from "../src/schedule";
 import { createScheduler, type ScheduledJob } from "../src/scheduler";
 import { fakeContext } from "./fakes";
 
@@ -298,5 +298,15 @@ describe("nightly", () => {
     });
     await tick();
     expect(tables.runs).toHaveLength(1);
+  });
+});
+
+describe("job intervals", () => {
+  it("every job the worker runs has its interval in @vici/shared (the api's sync health uses it)", () => {
+    const scheduled = buildSchedule(fakeContext().ctx, createScheduler(recordingLogger().log), [])
+      .map((job) => job.name)
+      .filter((name) => name !== "nightly");
+    const nightly = [...DAY_JOBS.map((job) => `nightly:${job.name}`), "nightly:cleanup"];
+    expect([...scheduled, ...nightly].sort()).toEqual([...SYNC_JOB_NAMES].sort());
   });
 });

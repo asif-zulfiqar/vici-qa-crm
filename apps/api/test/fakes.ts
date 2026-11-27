@@ -8,6 +8,7 @@ import type { PermissionsDb } from "@vici/db";
 import { createApp, type AppDeps } from "../src/app";
 import { InvalidToken, type TokenVerifier } from "../src/auth/token";
 import { createAccessService } from "../src/services/access";
+import { createFakeStore, emptyData, type FakeData } from "./fake-store";
 
 export const silentLogger = pino({ level: "silent" });
 
@@ -25,7 +26,13 @@ export const ids = {
   agent: "00000000-0000-4000-8000-000000000002",
   newbie: "00000000-0000-4000-8000-000000000003",
   inactive: "00000000-0000-4000-8000-000000000004",
+  manager: "00000000-0000-4000-8000-000000000005",
+  lead: "00000000-0000-4000-8000-000000000006",
+  leadNoTeam: "00000000-0000-4000-8000-000000000007",
 };
+
+/** Fixed "now" of the data tests: 25 Nov 2026, 15:30 UTC (10:30 Eastern). */
+export const NOW = new Date("2026-11-25T15:30:00Z");
 
 type ProfileRow = {
   id: string;
@@ -43,6 +50,25 @@ export function createFakeDb() {
       ["admin", { name: "Admin", permissions: new Set(["users.manage", "calls.view", "sync.view"]) }],
       ["agent", { name: "Agent", permissions: new Set(["agents.view_own"]) }],
       ["pending", { name: "Waiting for approval", permissions: new Set() }],
+      [
+        "manager",
+        {
+          name: "Manager",
+          permissions: new Set([
+            "live_floor.view",
+            "agents.view",
+            "calls.view",
+            "calls.view_pii",
+            "calls.listen",
+            "sync.view",
+            "data.all_teams",
+          ]),
+        },
+      ],
+      [
+        "team_lead",
+        { name: "Team lead", permissions: new Set(["live_floor.view", "agents.view", "calls.view", "calls.listen"]) },
+      ],
     ]),
     profiles: new Map<string, ProfileRow>(),
     /** userId -> permissionKey -> granted */
@@ -102,16 +128,25 @@ export function createFakeDb() {
   return { db, tables, addProfile };
 }
 
-/** The app with fake login and a fake database, plus the standard test users. */
-export function testApp(overrides: Partial<AppDeps> = {}) {
+/**
+ * The app with fake login, a fake database and the standard test users: admin (no team),
+ * agent 1004, an inactive admin, a manager (every team, full phones), a team lead of team
+ * "alpha" and a team lead without a team. `data` fills the fake data tables.
+ */
+export function testApp(overrides: Partial<AppDeps> = {}, data: FakeData = emptyData()) {
   const fake = createFakeDb();
   fake.addProfile({ id: ids.admin, roleKey: "admin", fullName: "Test Admin" });
   fake.addProfile({ id: ids.agent, roleKey: "agent", vicidialUser: "1004" });
   fake.addProfile({ id: ids.inactive, roleKey: "admin", active: false });
+  fake.addProfile({ id: ids.manager, roleKey: "manager" });
+  fake.addProfile({ id: ids.lead, roleKey: "team_lead", team: "alpha" });
+  fake.addProfile({ id: ids.leadNoTeam, roleKey: "team_lead" });
   const { app, routes } = createApp({
     verifyToken: fakeVerifier,
     access: createAccessService(fake.db),
+    store: createFakeStore(data),
     logger: silentLogger,
+    now: () => NOW,
     ...overrides,
   });
   return { app, routes, ...fake };

@@ -63,3 +63,11 @@ export function vicidialTimeOnDay(day: string, hour: number): Date {
 export function isVicidialDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && DateTime.fromFormat(value, DATE_FORMAT).isValid;
 }
+
+/** Number of Eastern days from `from` to `to`, both included: same day -> 1, to before from -> 0 or less. */
+export function vicidialDayCount(from: string, to: string): number {
+  const start = DateTime.fromFormat(from, DATE_FORMAT, { zone: VICIDIAL_TZ });
+  const end = DateTime.fromFormat(to, DATE_FORMAT, { zone: VICIDIAL_TZ });
+  if (!start.isValid || !end.isValid) throw new Error(`Invalid VICIdial day: "${from}" or "${to}"`);
+  return Math.round(end.diff(start, "days").days) + 1;
+}

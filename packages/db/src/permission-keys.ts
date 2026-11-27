@@ -7,6 +7,7 @@ export const PERMISSIONS = {
   "agents.view": "See stats of all agents",
   "agents.view_own": "See own stats only",
   "calls.view": "See the call list and call details",
+  "calls.view_pii": "See full phone numbers and lead IDs",
   "calls.listen": "Play call recordings",
   "calls.transcript": "Read call transcripts",
   "transfers.view": "See transfers (successes)",
@@ -21,6 +22,7 @@ export const PERMISSIONS = {
   "users.manage": "Manage users, roles and permissions",
   "settings.manage": "Change app settings",
   "sync.view": "See the sync health page",
+  "data.all_teams": "See every team, not only your own",
 } as const satisfies Record<string, string>;
 
 export type PermissionKey = keyof typeof PERMISSIONS;

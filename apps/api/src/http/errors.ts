@@ -2,16 +2,10 @@
 // A 500 never sends the stack trace: it is logged with the request id, and the response carries
 // the request id so we can find it in the logs.
 import type { ErrorRequestHandler, RequestHandler } from "express";
+import type { ApiError, ApiErrorCode } from "@vici/shared";
 
-export type ErrorCode =
-  | "bad_request"
-  | "unauthorized"
-  | "forbidden"
-  | "not_found"
-  | "conflict"
-  | "payload_too_large"
-  | "too_many_requests"
-  | "internal";
+/** The codes live in @vici/shared (api-types.ts), so the web app reads the same list. */
+export type ErrorCode = ApiErrorCode;
 
 /** One problem with an input value: where it is and what is wrong. Never the value itself. */
 export type Issue = { path: string; message: string };
@@ -36,7 +30,7 @@ export const forbidden = (message = "you do not have permission for this") =>
 export const notFound = (message = "not found") => new HttpError(404, "not_found", message);
 export const conflict = (message: string) => new HttpError(409, "conflict", message);
 
-type ErrorBody = { error: { code: ErrorCode; message: string; issues?: Issue[]; requestId?: string } };
+type ErrorBody = ApiError;
 
 export function errorBody(error: HttpError): ErrorBody {
   return {

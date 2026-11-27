@@ -8,6 +8,7 @@ import { createApp } from "./app";
 import { createTokenVerifier } from "./auth/token";
 import { loadEnv, type ApiEnv } from "./env";
 import { createAccessService } from "./services/access";
+import { createPrismaReadStore } from "./services/read-store";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -23,6 +24,7 @@ const logger = pino({ level: env.LOG_LEVEL });
 const { app } = createApp({
   verifyToken: createTokenVerifier({ supabaseUrl: env.SUPABASE_URL }),
   access: createAccessService(prisma),
+  store: createPrismaReadStore(prisma),
   logger,
 });
 

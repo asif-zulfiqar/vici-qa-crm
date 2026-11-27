@@ -6,3 +6,4 @@ dist/
 *.log
 .DS_Store
 packages/db/src/generated/
+docs/owner/final-scope-2026-11-25.pdf
